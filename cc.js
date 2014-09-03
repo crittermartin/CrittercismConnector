@@ -34,7 +34,7 @@ var apps,
 function getAllTheData() {
 	cc.apps(function(err, data) {
 		if (err) {
-			console.log('failed to retrieve apps: ' + JSON.stringify(err, null, '  '));
+			log('failed to retrieve apps: ' + JSON.stringify(err, null, '  '));
 			return;
 		}
 		for ( app in data ) {
@@ -63,13 +63,13 @@ function getAllTheData() {
 			});
 		}
 
-		console.log('Getting ' + outstanding + ' graphs for ' + Object.keys(apps).length + ' apps...');
+		log('Getting ' + outstanding + ' graphs for ' + Object.keys(apps).length + ' apps...');
 	});
 }
 
 function eatPerfPie(err, data) {
 	if (err) {
-		console.log('failed to get perf pie: ' + JSON.stringify(err, null, '  '));
+		log('failed to get perf pie: ' + JSON.stringify(err, null, '  '));
 		return;
 	}
 	var app = data['params']['appIds'][0];
@@ -84,7 +84,7 @@ function eatPerfPie(err, data) {
 
 function eatErrorGraph(err, data) {
 	if (err) {
-		console.log('failed to get error graph: ' + JSON.stringify(err, null, '  '));
+		log('failed to get error graph: ' + JSON.stringify(err, null, '  '));
 		return;
 	}
 	var app = data['params']['appIds'][0];
@@ -99,7 +99,7 @@ function eatErrorGraph(err, data) {
 
 function eatErrorPie(err, data) {
 	if (err) {
-		console.log('failed to get error pie: ' + JSON.stringify(err, null, '  '));
+		log('failed to get error pie: ' + JSON.stringify(err, null, '  '));
 		return;
 	}
 	var app = data['params']['appIds'][0];
@@ -164,17 +164,17 @@ function doAllTheStuff() {
 			}
 		}
 	}
-	console.log('Sending ' + buffer.split('\n').length + ' data points to graphite');
+	log('Sending ' + buffer.split('\n').length + ' data points to graphite');
 	sendBuffer(buffer);
 }
 
 function sendBuffer(buffer) {
-	console.log('Connect to Graphite host ' + config.Graphite.host + ':' + config.Graphite.carbonPort);
+	log('Connect to Graphite host ' + config.Graphite.host + ':' + config.Graphite.carbonPort);
 
 	var client = net.connect(config.Graphite.carbonPort, config.Graphite.host, function() {
-		console.log('Connected');
+		log('Connected');
 		client.write(buffer, 'utf8', function() {
-			console.log('Sent ' + buffer.split('\n').length + ' data points to graphite.');
+			log('Sent ' + buffer.split('\n').length + ' data points to graphite.');
 			client.end();
 		});	
 	});
@@ -182,23 +182,24 @@ function sendBuffer(buffer) {
 
 function updateGiraffe() {
 	var buffer = '// THIS IS A GENERATED FILE, DO NOT EDIT\n';
-	buffer += '// Please make edits in ../giraffe-dashboards-template.js\n\n';
+	buffer += '// Please make edits in ../giraffe-dashboards-template.js\n//\n';
 	buffer += 'var graphite_url = "http://' + config.Graphite.host + ':' + config.Graphite.httpPort + '";\n\n';
-	buffer += 'var appNames = [';
+
+	var appNames = [];
 	for ( app in apps ) {
-		buffer += '"' + apps[app]['appName'].split(' ').join('_').split('.').join('-') + '", ';
+		appNames.push(apps[app]['appName'].split(' ').join('_').split('.').join('-'));
 	}
-	buffer += '];\n';
+	buffer += 'var appNames = ' + JSON.stringify(appNames.sort(), null, '  ') + ';\n\n';
 
 	var template = fs.readFileSync('./giraffe-dashboards-template.js', 'utf8');
 	fs.writeFileSync('./giraffe/dashboards.js', buffer + template);
-	console.log('Updated Giraffe config with ' + Object.keys(apps).length + ' apps.');
+	log('Updated Giraffe config with ' + Object.keys(apps).length + ' apps.');
 }
 
 
 function listen(port) {
 	var requestLogger = function(req) {
-    console.log('[%s] "%s %s" "%s"', (new Date).toUTCString(), req.method.cyan, req.url.cyan, req.headers['user-agent']);
+    log(req.method.red + ' ' + req.url.cyan);
   };
 
   var options = {
@@ -214,29 +215,32 @@ function listen(port) {
 
   var server = httpServer.createServer(options);
   server.listen(port, null, function() {
-    console.log('Starting up http-server, serving '.yellow
+    log('Starting up http-server, serving '.yellow
       + server.root.cyan
       + ' on port: '.yellow
       + port.toString().cyan);
     var URL = 'http://localhost:' + port + '/';
-    console.log('Giraffe dashboards should be available at: ' + URL.red);
-    console.log('Hit CTRL-C to stop the server');
+    log('Giraffe dashboards should be available at: ' + URL.red);
+    log('Hit CTRL-C to stop the server');
   });
 }
 
+function log(message) {
+	console.log('[' + (new Date).toLocaleString() + '] ' + message);
+}
 
 cc.init(config.Crittercism.username, config.Crittercism.password, function(err) {
 	if (err) {
-		console.log('failed to initialize: ' + err['statusCode'] + ': ' + err['error_description']);
+		log('failed to initialize: ' + err['statusCode'] + ': ' + err['error_description']);
 		return;
 	}
-	console.log('initialized');
+	log('Crittercism API client initialized');
 
 	if ( process.argv[2] == 'now' ) {
 		getAllTheData();
 
 	} else {
-		console.log('will get data every :00 and :30');
+		log('Will get data every :00 and :30');
 		var rule = new schedule.RecurrenceRule();
 		rule.minute = [00, 30];
 		var job = schedule.scheduleJob(rule, function(){ getAllTheData() });

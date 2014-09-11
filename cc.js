@@ -35,7 +35,7 @@ var apps,
 
 var _this = this;
 
-function getServiceMetrics () {
+function getServiceMetrics(duration) {
 	cc.apps(function(err, data) {
 		if (err) {
 			log('failed to retrieve apps: ' + JSON.stringify(err, null, '  '));
@@ -51,7 +51,7 @@ function getServiceMetrics () {
 		pending.serviceMetrics = 0;
 		for ( app in apps ) {
 			serviceMetrics.forEach(function(element, index, array) {
-				cc.performancePie([app], element, 60, null, 'service', processServiceMetric);
+				cc.performancePie([app], element, duration, null, 'service', processServiceMetric);
 				pending.serviceMetrics++;
 			});
 		}
@@ -97,7 +97,7 @@ function sendServiceMetrics() {
 }
 
 
-function getAppMetrics() {
+function getAppMetrics(duration) {
 	cc.apps(function(err, data) {
 		if (err) {
 			log('failed to retrieve apps: ' + JSON.stringify(err, null, '  '));
@@ -111,7 +111,7 @@ function getAppMetrics() {
 		pending.appMetrics = 0;
 		for ( app in apps ) {
 			appMetrics.forEach(function(element, index, array) {
-				cc.errorGraph([app], element, 43200, null, processAppMetric);
+				cc.errorGraph([app], element, duration, null, processAppMetric);
 				pending.appMetrics++;
 			});
 		}
@@ -157,7 +157,7 @@ function sendAppMetrics() {
 }
 
 
-function getGroupedAppMetrics() {
+function getGroupedAppMetrics(duration) {
 	cc.apps(function(err, data) {
 		if (err) {
 			log('failed to retrieve apps: ' + JSON.stringify(err, null, '  '));
@@ -172,7 +172,7 @@ function getGroupedAppMetrics() {
 		for ( app in apps ) {
 			errorPieMetrics.forEach(function(metric) {
 				errorPieGroupings.forEach(function(groupBy) {
-					cc.errorPie([app], metric, 60, null, groupBy, processGroupedAppMetric);
+					cc.errorPie([app], metric, duration, null, groupBy, processGroupedAppMetric);
 					pending.groupedAppMetrics++;
 				});
 			});
@@ -299,16 +299,27 @@ cc.init(config.Crittercism.username, config.Crittercism.password, function(err) 
 	}
 	log('Crittercism API client initialized');
 
-	if ( process.argv[2] == 'now' ) {
-		getServiceMetrics();
-		getAppMetrics();
-		getGroupedAppMetrics();
-	} else {
-		log('Will get data every :00 and :30');
-		var rule = new schedule.RecurrenceRule();
-		rule.minute = [00, 30];
-		var job = schedule.scheduleJob(rule, function(){ getAllTheData() });
+	getServiceMetrics(15);
+	getAppMetrics(43200);
+	getGroupedAppMetrics(1440);
 
-		listen(config.listenPort);
-	}
+	var serviceMetricsRule = new schedule.RecurrenceRule();
+	serviceMetricsRule.minute = [00, 15, 30, 45];
+	var serviceMetricsJob = schedule.scheduleJob(serviceMetricsRule, function(){
+		getServiceMetrics(15);
+	});
+
+	var appMetricsRule = new schedule.RecurrenceRule();
+	appMetricsRule.minute = 5;
+	var appMetricsJob = schedule.scheduleJob(appMetricsRule, function() {
+		getAppMetrics(1440);
+	});
+
+	var groupedAppMetricsRule = new schedule.RecurrenceRule();
+	groupedAppMetricsRule.minute = 10;
+	var groupedAppMetricsJob = schedule.scheduleJob(groupedAppMetricsRule, function() {
+		getGroupedAppMetrics(1440);
+	});
+
+	listen(config.listenPort);
 });

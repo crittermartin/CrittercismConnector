@@ -8,7 +8,6 @@
 // performancePie - get data from /performanceManagement/pie endpoint
 // errorPie - get data from /errorMonitoring/pie endpoint
 // errorGraph - get data from /errorMonitoring/pie endpoint
-// clientPost - fill in the params and the path to get data for any Crittercism endpoint
 //
 // Please see http://docs.crittercism.com/api/api.html for detailed information
 // about the Crittercism REST API.
@@ -25,133 +24,93 @@ CrittercismClient.prototype.init = function init(user, pass, callback) {
 	this.user = user;
 	this.pass = pass;
 
-	var options = {
-		hostname: this.hostname,
-		port: this.port,
-		method: 'POST',
-		path: '/v1.0/token' + '?grant_type=password&username=' + this.user + '&password=' + this.pass,
-		auth: this.clientID + ':ANYTHING'
-	};
+	var path = '/v1.0/token' + '?grant_type=password&username=' + this.user + '&password=' + this.pass;
 
 	var _this = this;
-	var req = https.request(options, function(res) {
-		var buffer = '';
-		var failed = false;
-
-		if ( res.statusCode != 200 ) failed = true;
-
-	  res.setEncoding('utf8');
-	  res.on('data', function (chunk) {
-	    buffer += chunk;
-		}).on('end', function() {
-			if (failed) {
-				var err = JSON.parse(buffer);
-				err['statusCode'] = res.statusCode;
-				err['headers'] = res.headers;
-				callback(err);
-				return;
-			}
-			var o = JSON.parse(buffer);
-			_this.token = o['access_token'];
+	this.clientPost(path, null, function(err, data) {
+		if (err) {
+			callback(err);
+			return;
+		} else {
+			_this.token = data.access_token;
 			_this.tokenStr = 'Bearer ' + _this.token;
 			callback(null);
-		});
+		}
 	});
-	req.end();
 }
 
 CrittercismClient.prototype.apps = function apps(callback) {
 	var params = [
-				'appName',
-				'appType',
-				'appVersions',
-				'crashPercent',
-				'dau',
-				'latency',
-				'latestAppStoreReleaseDate',
-				'latestVersionString',
-				'linkToAppStore',
-				'iconURL',
-				'mau',
-				'rating',
-				'role'
-			];
+		'appName',
+		'appType',
+		'appVersions',
+		'crashPercent',
+		'dau',
+		'latency',
+		'latestAppStoreReleaseDate',
+		'latestVersionString',
+		'linkToAppStore',
+		'iconURL',
+		'mau',
+		'rating',
+		'role'
+	];
 
-	var options = {
-		hostname: this.hostname,
-		port: this.port,
-		method: 'GET',
-		path: '/v1.0/apps?attributes=' + params.join('%2C'),
-		auth: this.clientID + ':ANYTHING',
-		headers: {
-			'Content-type': 'application/json',
-			'Authorization': this.tokenStr
-		}
-	};
+	var path = '/v1.0/apps?attributes=' + params.join('%2C');
 
-	var req = https.request(options, function(res) {
-
-		var buffer = '';
-		var failed = false;
-		if ( res.statusCode != 200 ) failed = true;
-
-	  res.setEncoding('utf8');
-	  res.on('data', function (chunk) {
-	    buffer += chunk;
-		}).on('end', function() {
-			if (failed) {
-				try {
-					var err = JSON.parse(buffer);
-					err['statusCode'] = res.statusCode;
-					err['headers'] = res.headers;
-					callback(err);
-					return;
-				} catch (e) {
-					callback({'error_description': 'malformed JSON: ' + buffer});
-					return;
-				}
-			}
-			try {
-				var o = JSON.parse(buffer);
-			} catch (e) {
-				callback({'error_description': 'malformed JSON: ' + buffer});
-				return;
-			}
-			callback(null, o);
-		});
-	});
-
-	req.end();
+	this.clientGet(path, callback);
 }
 
-CrittercismClient.prototype.performancePie = function performancePie(appIds, graph, duration, groupBy, callback) {
+CrittercismClient.prototype.performancePie = function performancePie(appIds, graph, duration, filter, groupBy, callback) {
 
 	var path = '/v1.0/performanceManagement/pie';
 
 	var params = {'params': 
 		{
-			'appIds': appIds,
-			'graph': graph,
-			'duration': duration,
-			'groupBy': groupBy
+			appIds: appIds,
+			graph: graph,
+			duration: duration,
+			groupBy: groupBy
 		}
 	};
+
+	if ( filter != null ) params.filters = filter;
 
 	this.clientPost(path, params, callback);
 }
 
-CrittercismClient.prototype.errorPie = function errorPie(appIds, graph, duration, groupBy, callback) {
+CrittercismClient.prototype.errorPie = function errorPie(appIds, graph, duration, filter, groupBy, callback) {
 
 	var path = '/v1.0/errorMonitoring/pie';
 
 	var params = {'params': 
 		{
-			'appIds': appIds,
-			'graph': graph,
-			'duration': duration,
-			'groupBy': groupBy
+			appIds: appIds,
+			graph: graph,
+			duration: duration,
+			groupBy: groupBy
 		}
 	};
+
+	if ( filter != null ) params.filters = filter;
+
+	this.clientPost(path, params, callback);
+}
+
+CrittercismClient.prototype.errorSparklines = function errorSparklines(appIds, graph, duration, filter, groupBy, callback) {
+
+	var path = '/v1.0/errorMonitoring/sparklines';
+
+	var params = {'params': 
+		{
+			appIds: appIds,
+			graph: graph,
+			duration: duration,
+			groupBy: groupBy
+		}
+	};
+
+	if ( filter != null ) params.filters = filter;
 
 	this.clientPost(path, params, callback);
 }
@@ -161,23 +120,35 @@ CrittercismClient.prototype.errorGraph = function errorGraph(appIds, graph, dura
 
 	var params = {'params': 
 		{
-			'appIds': appIds,
-			'graph': graph,
-			'duration': duration
+			appIds: appIds,
+			graph: graph,
+			duration: duration
 		}
 	};
 
-	if ( filter != null ) params['filter'] = filter;
+	if ( filter != null ) params.filters = filter;
 
 	this.clientPost(path, params, callback);
 }
 
-CrittercismClient.prototype.clientPost = function clientPost(path, params, callback) {
+////////////////////////////////
+//
+// HTTPS client functions
+//
+CrittercismClient.prototype.clientGet = function clientGet(url, callback) {
+	this.clientRequest('GET', url, null, callback);
+}
+
+CrittercismClient.prototype.clientPost = function clientPost(url, params, callback) {
+	this.clientRequest('POST', url, params, callback);
+}
+
+CrittercismClient.prototype.clientRequest = function clientRequest(method, url, params, callback) {
 	var options = {
 		hostname: this.hostname,
 		port: this.port,
-		method: 'POST',
-		path: path,
+		method: method,
+		path: url,
 		auth: this.clientID + ':ANYTHING',
 		headers: {
 			'Content-type': 'application/json',
@@ -188,38 +159,31 @@ CrittercismClient.prototype.clientPost = function clientPost(path, params, callb
 	var req = https.request(options, function(res) {
 		var buffer = '';
 		var failed = false;
-		if ( res.statusCode != 200 ) failed = true;
+
+		if ( res.statusCode < 200 || res.statusCode > 204 ) failed = true;
 
 	  res.setEncoding('utf8');
 	  res.on('data', function (chunk) {
 	    buffer += chunk;
 		}).on('end', function() {
 			if (failed) {
-				try {
-					var err = JSON.parse(buffer);
-					err['statusCode'] = res.statusCode;
-					err['headers'] = res.headers;
-					callback(err);
-				} catch (e) {
-					callback({'error_description': 'malformed JSON: ' + buffer});
-				}
+				callback(res);
 				return;
 			}
-			else {
-				try {
-					var o = JSON.parse(buffer);
-				} catch (e) {
-					callback({'error_description': 'malformed JSON: ' + buffer});
-					return;
-				}
-				callback(null, o);
+			var o;
+			try {
+				o = JSON.parse(buffer);
+			} catch(e) {
+				o = e.message;
 			}
+
+			callback(null, o);
 		});
 	});
-	req.write(JSON.stringify(params));
+	if (params != null) {
+		req.write(JSON.stringify(params));
+	}
 	req.end();
 }
 
-
 module.exports = CrittercismClient;
-

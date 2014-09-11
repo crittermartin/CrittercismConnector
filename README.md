@@ -14,41 +14,47 @@ http://giraffe.kenhub.com/
 
 ##Instructions:
 
-(1) Install Graphite
+(1) Install Graphite.  Warning, Graphite is super hard to install on a Mac!
 
-(2) Edit Graphite's conf/storage_schemas.conf and add retention settings for app data:
+(2) Install node.js.
+
+(3) Edit Graphite's conf/storage_schemas.conf and add retention settings for app data:
 ```
 [app_perf]
 pattern = ^app\..*\.services\.
-retentions = 60m:90d, 1d:5y
+retentions = 15m:90d, 1d:5y
 
 [app_daily]
 pattern = ^app\.
 retentions = 1d:5y
 ```
-(3) Start the Carbon cache, for example:
+(4) Edit Carbon's configuration in Graphite's conf/carbon.conf so that it will let a lot of databases get created.  Change the line:
+```
+MAX_CREATES_PER_MINUTE = 50
+```
+to:
+```
+MAX_CREATES_PER_MINUTE = 5000
+```
+(5) Start the Carbon cache, for example:
 ```
 ${GRAPHITE_HOME}/bin/carbon-cache.py start
 ```
-(4) Start the Graphite server:
+(6) Start the Graphite server:
 ```
 ${GRAPHITE_HOME}/bin/run-graphite-devel-server.py
 ```
-(5) Get the package dependencies for this app:
+(7) Get the package dependencies for this app:
 ```
 npm install
 ```
-(6) Edit ccconfig.js in this directory and fill in your Crittercism and Graphite details.
+(8) Edit ccconfig.js in the CrittercismConnector directory and fill in your Crittercism and Graphite details.
 
-(7) Run the app with the "now" argument to get initial data to look at:
-```
-node cc now
-```
-(8) Run the app in continuous mode with the HTTP listener for Giraffe:
+(9) Run the app:
 ```
 node cc
 ```
-Point your browser at the URL you see in the console output and you should be good to go!
+Point your browser at the URL you see in the console output (http://localhost:11563 is the default) and you should be good to go!
 
 
 ##TODO
